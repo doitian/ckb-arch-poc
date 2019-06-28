@@ -20,15 +20,7 @@ fn app() -> Result<(), ExidCode> {
 
     tokio::run(
         debug_console
-            .for_each(|peer| {
-                let (tx, rx) = peer.split();
-                tokio::spawn(
-                    tx.send_all(rx)
-                        .map(|_| ())
-                        .map_err(|err| error!("debug console error: {}", err)),
-                );
-                Ok(())
-            })
+            .run()
             .map_err(|err| error!("debug console error: {}", err)),
     );
     Ok(())

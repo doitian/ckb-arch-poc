@@ -1,45 +1,50 @@
-use log::{error, info};
-use tokio::io::copy;
-use tokio::net::TcpListener;
+mod args;
+mod debug_console;
+
+use args::Args;
+use debug_console::DebugConsole;
+use log::error;
 use tokio::prelude::*;
 
 fn main() {
+    if app().is_err() {
+        std::process::exit(113);
+    }
+}
+
+fn app() -> Result<(), ExidCode> {
     pretty_env_logger::init_timed();
 
-    let mut args = std::env::args().skip(1);
+    let args = Args::parse()?;
+    let debug_console = DebugConsole::bind(&args.bind)?;
 
-    let addr = args
-        .next()
-        .unwrap_or("127.0.0.1:12345".to_string())
-        .parse()
-        .expect("valid bind address");
+    tokio::run(
+        debug_console
+            .for_each(|peer| {
+                let (tx, rx) = peer.split();
+                tokio::spawn(
+                    tx.send_all(rx)
+                        .map(|_| ())
+                        .map_err(|err| error!("debug console error: {}", err)),
+                );
+                Ok(())
+            })
+            .map_err(|err| error!("debug console error: {}", err)),
+    );
+    Ok(())
+}
 
-    if args.next().is_some() {
-        eprintln!("ckb-arch-poc [bind]");
-        std::process::exit(127);
+struct ExidCode;
+
+impl From<std::io::Error> for ExidCode {
+    fn from(e: std::io::Error) -> Self {
+        eprintln!("error: {}", e);
+        ExidCode
     }
+}
 
-    info!("listen on {}", addr);
-    let listener = TcpListener::bind(&addr).expect("unable to bind TCP listener");
-
-    let server = listener
-        .incoming()
-        .map_err(|e| error!("accept failed = {:?}", e))
-        .for_each(|sock| {
-            // Split up the reading and writing parts of the
-            // socket.
-            let (reader, writer) = sock.split();
-
-            // A future that echos the data and returns how
-            // many bytes were copied...
-            let bytes_copied = copy(reader, writer);
-
-            let inspect = bytes_copied
-                .map(|amount| info!("wrote {:} bytes", amount.0))
-                .map_err(|err| error!("IO error {:?}", err));
-
-            tokio::spawn(inspect)
-        });
-
-    tokio::run(server);
+impl From<()> for ExidCode {
+    fn from(_: ()) -> Self {
+        ExidCode
+    }
 }

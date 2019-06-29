@@ -3,7 +3,7 @@ mod debug_console;
 
 use args::Args;
 use debug_console::DebugConsole;
-use log::info;
+use log::{error, info};
 use tokio::prelude::*;
 
 fn main() {
@@ -20,7 +20,11 @@ fn app() -> Result<(), ExidCode> {
 
     tokio::run(debug_console.for_each(|cmd| {
         info!(target: "ckb_arch_poc::debug_console", "{}", cmd);
-        cmd.reply(cmd.body().to_string());
+        tokio::spawn(
+            cmd.reply(cmd.body().to_string())
+                .map(|_| ())
+                .map_err(|err| error!("reply error: {}", err)),
+        );
         Ok(())
     }));
     Ok(())

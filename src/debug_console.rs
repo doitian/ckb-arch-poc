@@ -7,6 +7,7 @@ use tokio::{
     prelude::*,
     sync::mpsc,
 };
+use futures::sink;
 use std::fmt;
 
 pub struct DebugConsole {
@@ -83,8 +84,8 @@ impl DebugConsoleRequest {
         &self.body
     }
 
-    pub fn reply(&self, response: String) {
-        tokio::spawn(self.responses_tx.clone().send(response).map(|_| ()).map_err(|err| error!("reply error: {}", err)));
+    pub fn reply(&self, response: String) -> sink::Send<mpsc::Sender<String>> {
+        self.responses_tx.clone().send(response)
     }
 }
 

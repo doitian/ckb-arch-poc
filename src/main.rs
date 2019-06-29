@@ -20,6 +20,7 @@ fn app() -> Result<(), ExidCode> {
 
     tokio::run(debug_console.for_each(|cmd| {
         info!(target: "ckb_arch_poc::debug_console", "{}", cmd);
+        cmd.reply(cmd.body().to_string());
         Ok(())
     }));
     Ok(())

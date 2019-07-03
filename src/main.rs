@@ -3,8 +3,6 @@ mod debug_console;
 
 use args::Args;
 use debug_console::DebugConsole;
-use log::{error, info};
-use tokio::prelude::*;
 
 fn main() {
     if app().is_err() {
@@ -16,17 +14,8 @@ fn app() -> Result<(), ExidCode> {
     pretty_env_logger::init_timed();
 
     let args = Args::parse()?;
-    let debug_console = DebugConsole::bind(&args.bind)?;
+    tokio::run(DebugConsole::bind(&args.bind)?);
 
-    tokio::run(debug_console.for_each(|cmd| {
-        info!(target: "ckb_arch_poc::debug_console", "{}", cmd);
-        tokio::spawn(
-            cmd.reply(cmd.body().to_string())
-                .map(|_| ())
-                .map_err(|err| error!("reply error: {}", err)),
-        );
-        Ok(())
-    }));
     Ok(())
 }
 

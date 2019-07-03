@@ -5,18 +5,18 @@ use tokio::{
     codec::{Decoder, LinesCodec},
     net::{tcp::Incoming, TcpListener, TcpStream},
     prelude::*,
-    sync::mpsc,
+    sync::mpsc::{channel, Receiver, Sender},
 };
 
 pub struct DebugConsole {
     incoming: Incoming,
-    requests_queue_sender: mpsc::Sender<Request>,
-    requests_queue_receiver: mpsc::Receiver<Request>,
+    requests_queue_sender: Sender<Request>,
+    requests_queue_receiver: Receiver<Request>,
 }
 
 struct Request {
     body: String,
-    responses_queue_sender: mpsc::Sender<String>,
+    responses_queue_sender: Sender<String>,
 }
 
 const CHANNEL_BOUND: usize = 64;
@@ -24,7 +24,7 @@ const CHANNEL_BOUND: usize = 64;
 impl DebugConsole {
     pub fn bind(addr: &SocketAddr) -> io::Result<DebugConsole> {
         let listener = TcpListener::bind(&addr)?;
-        let (requests_queue_sender, requests_queue_receiver) = mpsc::channel(CHANNEL_BOUND);
+        let (requests_queue_sender, requests_queue_receiver) = channel(CHANNEL_BOUND);
 
         Ok(DebugConsole {
             incoming: listener.incoming(),
@@ -33,8 +33,8 @@ impl DebugConsole {
         })
     }
 
-    fn on_connection(&self, socket: TcpStream, requests_queue_sender: mpsc::Sender<Request>) {
-        let (responses_queue_sender, responses_queue_receiver) = mpsc::channel(CHANNEL_BOUND);
+    fn on_connection(&self, socket: TcpStream, requests_queue_sender: Sender<Request>) {
+        let (responses_queue_sender, responses_queue_receiver) = channel(CHANNEL_BOUND);
         let (socket_sender, socket_receiver) = LinesCodec::new().framed(socket).split();
 
         tokio::spawn(

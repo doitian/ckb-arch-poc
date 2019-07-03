@@ -1,8 +1,11 @@
 mod args;
+mod chain;
 mod debug_console;
 
 use args::Args;
+use chain::ChainService;
 use debug_console::DebugConsole;
+use futures::future::Future;
 
 fn main() {
     if app().is_err() {
@@ -14,7 +17,13 @@ fn app() -> Result<(), ExidCode> {
     pretty_env_logger::init_timed();
 
     let args = Args::parse()?;
-    tokio::run(DebugConsole::bind(&args.bind)?);
+
+    let (chain, chain_service) = ChainService::spawn();
+    let debug_console = DebugConsole::bind(&args.bind)?;
+
+    chain.info().wait().expect("get info");
+
+    tokio::run(chain_service.join(debug_console).map(|_| ()));
 
     Ok(())
 }
